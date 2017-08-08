@@ -16,6 +16,8 @@ var _qs2 = _interopRequireDefault(_qs);
 
 var _oauth = require('oauth-1.0a');
 
+var crypto = require('crypto');
+
 var _oauth2 = _interopRequireDefault(_oauth);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -33,7 +35,10 @@ var _class = function () {
 		if (this.credentials) {
 			this.oauth = new _oauth2.default({
 				consumer: config.credentials.client,
-				signature_method: 'HMAC-SHA1'
+				signature_method: 'HMAC-SHA1',
+				hash_function: function(base_string, key) {
+			        return crypto.createHmac('sha1', key).update(base_string).digest('base64');
+			    }
 			});
 		}
 		this.config = config;
@@ -68,7 +73,7 @@ var _class = function () {
 		key: 'getRequestToken',
 		value: function getRequestToken() {
 			var _this2 = this;
-
+			
 			if (!this.config.callbackURL) {
 				throw new Error('Config does not include a callbackURL value.');
 			}
@@ -96,7 +101,7 @@ var _class = function () {
 				oauth_verifier: oauthVerifier
 			}).then(function (data) {
 				_this3.config.credentials.token = {
-					public: data.oauth_token,
+					key: data.oauth_token,
 					secret: data.oauth_token_secret
 				};
 
@@ -106,7 +111,7 @@ var _class = function () {
 	}, {
 		key: 'authorize',
 		value: function authorize(next) {
-
+			alert(1);
 			var args = {};
 			var savedCredentials = window.localStorage.getItem('requestTokenCredentials');
 			if (window.location.href.indexOf('?')) {
@@ -114,10 +119,12 @@ var _class = function () {
 			}
 
 			if (!this.config.credentials.client) {
+				alert(2);
 				return this.getConsumerToken().then(this.authorize.bind(this));
 			}
 
-			if (this.config.credentials.token && this.config.credentials.token.public) {
+			if (this.config.credentials.token && this.config.credentials.token.key) {
+				alert(3);
 				return Promise.resolve("Success");
 			}
 
@@ -127,15 +134,19 @@ var _class = function () {
 			}
 
 			if (!this.config.credentials.token) {
+				alert(6);
 				return this.getRequestToken().then(this.authorize.bind(this));
-			} else if (!this.config.credentials.token.public && !savedCredentials) {
+			} else if (!this.config.credentials.token.key && !savedCredentials) {
+				alert(7);
 				window.localStorage.setItem('requestTokenCredentials', JSON.stringify(this.config.credentials));
 				window.location = next.redirectURL;
 				throw 'Redirect to authrization page...';
-			} else if (!this.config.credentials.token.public && args.oauth_token) {
-				this.config.credentials.token.public = args.oauth_token;
+			} else if (!this.config.credentials.token.key && args.oauth_token) {
+				alert(8);
+				this.config.credentials.token.key = args.oauth_token;
 				return this.getAccessToken(args.oauth_verifier);
 			}
+			alert(9);
 		}
 	}, {
 		key: 'saveCredentials',
@@ -215,6 +226,7 @@ var _class = function () {
 			}
 
 			if (this.oauth) {
+				console.log('R5');
 				var oauthData = this.oauth.authorize({
 					method: method,
 					url: url,
