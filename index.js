@@ -96,15 +96,16 @@ var _class = function () {
 		key: 'getAccessToken',
 		value: function getAccessToken(oauthVerifier) {
 			var _this3 = this;
-
+			alert('A1');
 			return this.post(this.config.url + 'oauth1/access', {
 				oauth_verifier: oauthVerifier
 			}).then(function (data) {
+				alert('A3');
 				_this3.config.credentials.token = {
-					key: data.oauth_token,
+					public: data.oauth_token,
 					secret: data.oauth_token_secret
 				};
-
+				alert('A4');
 				return _this3.config.credentials.token;
 			});
 		}
@@ -123,7 +124,7 @@ var _class = function () {
 				return this.getConsumerToken().then(this.authorize.bind(this));
 			}
 
-			if (this.config.credentials.token && this.config.credentials.token.key) {
+			if (this.config.credentials.token && this.config.credentials.token.public) {
 				alert(3);
 				return Promise.resolve("Success");
 			}
@@ -136,14 +137,15 @@ var _class = function () {
 			if (!this.config.credentials.token) {
 				alert(6);
 				return this.getRequestToken().then(this.authorize.bind(this));
-			} else if (!this.config.credentials.token.key && !savedCredentials) {
+			} else if (!this.config.credentials.token.public && !savedCredentials) {
 				alert(7);
 				window.localStorage.setItem('requestTokenCredentials', JSON.stringify(this.config.credentials));
 				window.location = next.redirectURL;
 				throw 'Redirect to authrization page...';
-			} else if (!this.config.credentials.token.key && args.oauth_token) {
+			} else if (!this.config.credentials.token.public && args.oauth_token) {
 				alert(8);
-				this.config.credentials.token.key = args.oauth_token;
+				alert(JSON.stringify(args));
+				this.config.credentials.token.public = args.oauth_token;
 				return this.getAccessToken(args.oauth_verifier);
 			}
 			alert(9);
@@ -231,23 +233,28 @@ var _class = function () {
 					method: method,
 					url: url,
 					data: oauthData
-				}, this.config.credentials.token ? this.config.credentials.token : null);
+				}, this.config.credentials.token);
+				console.log('R6:'+JSON.stringify(this.config.credentials.token));
 			}
 
 			var headers = {
 				Accept: 'application/json',
 				'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
 			};
+			console.log('R7');
 
 			var requestUrls = [this.config.url + 'oauth1/request'];
+			
+			console.log('R8');
 
 			/**
     * Only attach the oauth headers if we have a request token, or it is a request to the `oauth/request` endpoint.
     */
+			console.log('R10:' + JSON.stringify(oauthData));
 			if (this.oauth && this.config.credentials.token || requestUrls.indexOf(url) > -1) {
 				headers = _extends({}, headers, this.oauth.toHeader(oauthData));
 			}
-
+			console.log('R11:' + JSON.stringify(headers));
 			return fetch(url, {
 				method: method,
 				headers: headers,
