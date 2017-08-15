@@ -24,6 +24,10 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+function HandlePopupResult(result) {
+    alert("result of popup is: " + result);
+}
+
 var _class = function () {
 	function _class(config) {
 		_classCallCheck(this, _class);
@@ -89,6 +93,7 @@ var _class = function () {
 					secret: data.oauth_token_secret
 				};
 
+				
 				return { redirectURL: redirectURL, token: data };
 			});
 		}
@@ -96,59 +101,83 @@ var _class = function () {
 		key: 'getAccessToken',
 		value: function getAccessToken(oauthVerifier) {
 			var _this3 = this;
-			alert('A1');
+			console.log('A1');
 			return this.post(this.config.url + 'oauth1/access', {
 				oauth_verifier: oauthVerifier
 			}).then(function (data) {
-				alert('A3');
+				console.log('A3');
 				_this3.config.credentials.token = {
 					public: data.oauth_token,
 					secret: data.oauth_token_secret
 				};
-				alert('A4');
+				console.log('A4');
 				return _this3.config.credentials.token;
 			});
 		}
 	}, {
 		key: 'authorize',
 		value: function authorize(next) {
-			alert(1);
+			console.log(1);
 			var args = {};
 			var savedCredentials = window.localStorage.getItem('requestTokenCredentials');
-			if (window.location.href.indexOf('?')) {
+			if (window.location.href.indexOf('?') > 0) {
 				args = _qs2.default.parse(window.location.href.split('?')[1]);
+				console.log(1.2);
+			}
+			
+			if( (typeof next === 'string' || next instanceof String) && next.indexOf('?')) {
+				args = _qs2.default.parse(next.split('?')[1]);
+				console.log(1.3);
 			}
 
 			if (!this.config.credentials.client) {
-				alert(2);
+				console.log(2);
 				return this.getConsumerToken().then(this.authorize.bind(this));
 			}
 
 			if (this.config.credentials.token && this.config.credentials.token.public) {
-				alert(3);
+				console.log(3);
 				return Promise.resolve("Success");
 			}
 
 			if (savedCredentials) {
+				console.log(4);
 				this.config.credentials = JSON.parse(savedCredentials);
 				window.localStorage.removeItem('requestTokenCredentials');
 			}
 
 			if (!this.config.credentials.token) {
-				alert(6);
+				console.log(6);
 				return this.getRequestToken().then(this.authorize.bind(this));
 			} else if (!this.config.credentials.token.public && !savedCredentials) {
-				alert(7);
+				console.log(7);
 				window.localStorage.setItem('requestTokenCredentials', JSON.stringify(this.config.credentials));
-				window.location = next.redirectURL;
-				throw 'Redirect to authrization page...';
+				console.log(7.1);
+				//window.location = next.redirectURL;
+				//throw 'Redirect to authrization page...'; // This only works in the browser
+				if(!next)
+				{
+					console.log(7.2);
+					next = {redirectURL: this.config.callbackURL};
+					console.log("7.3:"+JSON.stringify(next));
+				}
+				this.OpenDialog(next.redirectURL);
+				console.log(7.4);
 			} else if (!this.config.credentials.token.public && args.oauth_token) {
-				alert(8);
-				alert(JSON.stringify(args));
+				console.log(8);
+				console.log(JSON.stringify(args));
 				this.config.credentials.token.public = args.oauth_token;
-				return this.getAccessToken(args.oauth_verifier);
+				var self = this; 
+				return this.getAccessToken(args.oauth_verifier).then(function (token) {
+					console.log("AT1:" + JSON.stringify(token));
+					console.log("AT2:" + JSON.stringify(self.config.credentials));
+					self.saveCredentials();
+				});
+			} else if (savedCredentials) {
+				return this.authorize.bind(this, next); // restart the process, and no die in error
 			}
-			alert(9);
+			return Promise.resolve("Error");
+			console.log(9);
 		}
 	}, {
 		key: 'saveCredentials',
@@ -160,6 +189,7 @@ var _class = function () {
 		value: function removeCredentials() {
 			delete this.config.credentials.token;
 			window.localStorage.removeItem('tokenCredentials');
+			window.localStorage.removeItem('requestTokenCredentials');
 		}
 	}, {
 		key: 'hasCredentials',
@@ -262,25 +292,56 @@ var _class = function () {
 				body: ['GET', 'HEAD'].indexOf(method) > -1 ? null : _qs2.default.stringify(data)
 			}).then(function (response) {
 				if (response.headers.get('Content-Type') && response.headers.get('Content-Type').indexOf('x-www-form-urlencoded') > -1) {
+					console.log('R12:');
 					return response.text().then(function (text) {
 						return _qs2.default.parse(text);
+						console.log('R13:');
 					});
 				}
 				return response.text().then(function (text) {
-
+					console.log('R14:');
 					try {
 						var json = JSON.parse(text);
+						console.log('R15:');
 					} catch (e) {
+						console.log('R16:'+text+', Status:'+response.status);
 						throw { message: text, code: response.status };
 					}
 
 					if (response.status >= 300) {
+						console.log('R17:');
 						throw json;
 					} else {
+						console.log('R18:');
 						return json;
 					}
 				});
 			});
+		}
+	},{
+		key: 'lastReturnUrl',
+		value: ''
+	},{
+		key: 'OpenDialog',
+		value: function OpenDialog(url)
+		{
+			var self = this;
+			
+			console.log("Dia1:");
+		    var win = window.open(url);
+		    win.addEventListener("loadstop", function(event) {
+		    	if(event.url.indexOf(self.config.callbackURL) > -1)
+		    	{
+		    		console.log("dia1.3:" + event.url);
+		    		win.close();
+		    		self.authorize(event.url);
+		    	}
+		    });
+		    console.log("Dia2:");//+JSON.stringify(win));
+		    window.addEventListener("message", function(event) {
+		    	console.log("dia3:" + event.data);
+		    	self.authorize(event.data);
+		    }, false );
 		}
 	}]);
 
